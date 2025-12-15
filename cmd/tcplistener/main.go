@@ -1,68 +1,33 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"net"
+
+	"github.com/jrooke/httpfromtcp/internal/request"
 )
-
-func getLinesChannel(f io.ReadCloser) <-chan string {
-	out := make(chan string, 1)
-	go func() {
-		defer f.Close()
-		defer close(out)
-		str := ""
-		for {
-			data := make([]byte, 8)
-
-			n, err := f.Read(data)
-			if err != nil {
-				break
-			}
-			data = data[:n]
-
-			i := bytes.IndexByte(data, '\n')
-			if i != -1 {
-				str += string(data[:i])
-				data = data[i+1:]
-				out <- str
-				str = ""
-			}
-			str += string(data)
-		}
-
-		if len(str) != 0 {
-			out <- str
-		}
-	}()
-	return out
-}
 
 func main() {
 
-	// Create a TCP listener on port 42069
 	listener, err := net.Listen("tcp", ":42069")
-
-	// if there's an error, quit
 	if err != nil {
 		log.Fatal("error", "error", err)
 	}
 
 	for {
-
-		// Pause and wait for an incoming connection
 		conn, err := listener.Accept()
-
-		// Exit if error in connection.
 		if err != nil {
 			log.Fatal("error", "error", err)
 		}
 
-		// Read and print data from the channel
-		for line := range getLinesChannel(conn) {
-			fmt.Printf("read: %s\n", line)
+		r, err := request.RequestFromReader(conn)
+		if err != nil {
+			log.Fatal("error", "error", err)
 		}
+		fmt.Printf("Request line: \n")
+		fmt.Printf("- Method: %s\n", r.RequestLine.Method)
+		fmt.Printf("- Target: %s\n", r.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %s\n", r.RequestLine.HttpVersion)
 	}
 }
