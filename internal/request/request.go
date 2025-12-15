@@ -6,34 +6,36 @@ import (
 	"io"
 )
 
+// We are trying to parse a line
+// to get the following attributes
 type RequestLine struct {
 	HttpVersion   string
 	RequestTarget string
 	Method        string
 }
 
+// Method receives a pointer to a RequestLine struct and
+// returns whether or not the HTTP Version is exactly 1.1
 func (r *RequestLine) ValidHTTP() bool {
 	return r.HttpVersion == "HTTP/1.1"
 }
 
+// The general Request struct which contains
+// RequestLine nested within (Method, HTTP Version, etc.) and
+// the state of the request (init, done, error) to identify when to exit
 type Request struct {
 	RequestLine RequestLine
 	state       parserState
 }
 
+// Initializes a new Request with StateInit and returns a pointer to it
 func newRequest() *Request {
 	return &Request{
 		state: StateInit,
 	}
 }
 
-var ERROR_MALFORMED_REQUEST_LINE = fmt.Errorf("ERRIR: Malformed Request Line")
-var ERROR_UNSUPPORTED_HTTP_VERSION = fmt.Errorf("ERROR: Unsupported HTTP Version")
-var ERROR_REQUEST_IN_ERROR_STATE = fmt.Errorf("Request in error state.")
-var SEPARATOR = []byte("\r\n")
-
-// CONTINUE FROM 1:15
-
+// Custom parserState type for different request states
 type parserState string
 
 const (
@@ -41,6 +43,13 @@ const (
 	StateDone  parserState = "done"
 	StateError parserState = "error"
 )
+
+// Constants, including error codes and
+// defined separator to indicate when to stop parsing
+var ERROR_MALFORMED_REQUEST_LINE = fmt.Errorf("ERRIR: Malformed Request Line")
+var ERROR_UNSUPPORTED_HTTP_VERSION = fmt.Errorf("ERROR: Unsupported HTTP Version")
+var ERROR_REQUEST_IN_ERROR_STATE = fmt.Errorf("Request in error state.")
+var SEPARATOR = []byte("\r\n")
 
 func ParseRequestLine(b []byte) (*RequestLine, int, error) {
 	idx := bytes.Index(b, SEPARATOR)
