@@ -1,1 +1,3 @@
-Here is the messages text. Just writing lots of random stuff to see how this all goes.
+Here is the messages text. 
+Just writing lots of random stuff to see how this all goes.
+But this is going to become a http from tcp parser / server from scratch.

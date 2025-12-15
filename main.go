@@ -5,70 +5,96 @@ import (
 	"os"
 	"fmt"
 	"bytes"
+	"io"
 )
 
-func main() {
-	// Open the file named "messages.txt" and store the file handle in variable f
-	// Also capture any error that might occur during the file open
-	f, err := os.Open("messages.txt")
+func getLinesChannel(f io.ReadCloser) <-chan string {
 	
-	// Check if an error occurred when opening the file
+	// Create a channel with a buffer of 1, in string format
+	out := make(chan string, 1)
+
+	// Run anonymous function in background
+	go func() {
+
+		// Close file when function ends.
+		defer f.Close()
+
+		// Close the channel, ending background function.
+		defer close(out)
+
+		// Create empty string.
+		str := ""
+
+		// Start infinite loop.
+		for {
+
+			// Attempt to create an 8-byte buffer.
+			data := make([]byte, 8)
+
+			// (n, err) is a tuple
+			// n = length, err = error code, if any
+			n, err := f.Read(data)
+
+			// If error, break loop, which will close channel
+			if err != nil {
+				break
+			}
+
+			// Get data up to length of 8-byte buffer.
+			data = data[:n]
+			
+			// Search data for a '\n' new line.
+			// IndexByte returns position of \n, -1 if not found.
+			i := bytes.IndexByte(data, '\n')
+
+		// If a new line is found (i is not -1)...
+		if i != -1 {
+
+			// Add everything before the newline to str
+			str += string(data[:i])
+
+			// Keep only the data after the newline for next iteration
+			data = data[i + 1:]
+
+				// The channel sends out whatever is in str.
+				out <- str
+
+				// String is cleared out.
+				str = ""
+			}
+
+			// Append to string any remaining data.
+			str += string(data)
+		}
+
+		// Handle case where file ends without a newline
+		// Send any leftover data that didn't have a newline after it
+		if len(str) != 0 {
+			out <- str
+		}
+	} ()
+
+	// Despite what happens inside loop, exit function.
+	return out
+}
+
+func main() {
+
+	// Open the file and store file handle in f, and error in err.
+	f, err := os.Open("messages.txt")
+
+	// If error, log it and quit.
 	if err != nil {
-		// If yes, log the error and stop the program immediately
 		log.Fatal("error", "error", err)
 	}
 
-	// Create an empty string variable to accumulate partial lines as we read chunks
-	str := ""
-	
-	// Start an infinite loop that will read the entire file
-	for {
-		// Create a byte buffer (array) with space for exactly 8 bytes
-		data := make([]byte, 8)
-		
-		// Read up to 8 bytes from the file into the buffer
-		// n = how many bytes were actually read (might be less than 8)
-		// err = any error that occurred (usually signals end of file)
-		n, err := f.Read(data)
-		
-		// Check if an error occurred during the read (typically end of file)
-		if err != nil {
-			// If yes, break out of the loop and stop reading
-			break
-		}
+	// Create a background channel called lines
+	lines := getLinesChannel(f)
 
-		// Trim the data buffer to only include the bytes we actually read
-		// This removes any garbage data in the unused positions
-		data = data[:n]
-		
-		// Search for a newline character ('\n') in the data we just read
-		// i = the position where newline was found, or -1 if not found
-		if i := bytes.IndexByte(data, '\n'); i != -1 {
-			// We found a newline! This means we have a complete line
-			
-			// Add everything BEFORE the newline to our accumulated string
-			str += string(data[:i])
-			
-			// Remove everything up to and including the newline from the data
-			// This leaves any text that came after the newline
-			data = data[i + 1:]
-			
-			// Print the complete line we've assembled
-			fmt.Printf("read: %s\n", str)
-			
-			// Reset the string accumulator to empty, ready for the next line
-			str = ""
-		}
-		
-		// Add any remaining bytes from this chunk to our string accumulator
-		// (This could be the start of a new line if no newline was found)
-		str += string(data)
-	}
+	// Go through each line
+	for line := range lines {
 
-	// After the loop ends, check if there are any leftover bytes
-	if len(str) != 0 {
-		// If yes, this is a partial line at the end of the file (no newline after it)
-		// Print it so we don't lose data
-		fmt.Printf("read %s\n", str)
+		// Print each line
+		fmt.Printf("%s\n", line)
 	}
 }
